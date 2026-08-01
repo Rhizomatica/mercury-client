@@ -24,9 +24,10 @@ type AppState struct {
 	arqPortEntry        *widget.Entry
 	broadcastPortEntry  *widget.Entry
 
-	messageEntry    *widget.Entry
-	filePathEntry   *widget.Entry
-	selectFileButton *widget.Button
+	arqMessageEntry       *widget.Entry
+	broadcastMessageEntry *widget.Entry
+	filePathEntry         *widget.Entry
+	selectFileButton      *widget.Button
 
 	connectButton       *widget.Button
 	disconnectButton    *widget.Button
@@ -81,8 +82,11 @@ func (appState *AppState) setupUI(a fyne.App) {
 	appState.broadcastPortEntry.SetPlaceHolder("Broadcast Port")
 	appState.broadcastPortEntry.SetText("8100")
 
-	appState.messageEntry = widget.NewMultiLineEntry()
-	appState.messageEntry.SetPlaceHolder("Enter ARQ message here...")
+	appState.arqMessageEntry = widget.NewMultiLineEntry()
+	appState.arqMessageEntry.SetPlaceHolder("Enter ARQ message here...")
+
+	appState.broadcastMessageEntry = widget.NewMultiLineEntry()
+	appState.broadcastMessageEntry.SetPlaceHolder("Enter Broadcast message here...")
 
 	appState.filePathEntry = widget.NewEntry()
 	appState.filePathEntry.SetPlaceHolder("No file selected")
@@ -146,7 +150,7 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 
 	messageInput := container.NewVBox(
 		widget.NewLabel("ARQ Message (sent over data port):"),
-		appState.messageEntry,
+		appState.arqMessageEntry,
 		appState.sendARQMsgButton,
 	)
 
@@ -160,7 +164,7 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 
 	broadcastInput := container.NewVBox(
 		widget.NewLabel("Broadcast Message (KISS):"),
-		appState.messageEntry,
+		appState.broadcastMessageEntry,
 		appState.sendBroadcastButton,
 	)
 
@@ -273,7 +277,7 @@ func (appState *AppState) disconnectARQ() {
 }
 
 func (appState *AppState) sendARQMessage() {
-	msg := appState.messageEntry.Text
+	msg := appState.arqMessageEntry.Text
 	if msg == "" {
 		dialog.ShowInformation("Empty Message", "Please enter a message to send.", appState.mainWin)
 		return
@@ -291,7 +295,7 @@ func (appState *AppState) sendARQMessage() {
 		return
 	}
 	appState.logMessage(fmt.Sprintf("ARQ Data TX: %d bytes", len(msg)))
-	appState.messageEntry.SetText("")
+	appState.arqMessageEntry.SetText("")
 }
 
 func (appState *AppState) sendARQFile() {
@@ -317,7 +321,7 @@ func (appState *AppState) sendARQFile() {
 }
 
 func (appState *AppState) sendBroadcast() {
-	msg := appState.messageEntry.Text
+	msg := appState.broadcastMessageEntry.Text
 	if msg == "" {
 		dialog.ShowInformation("Empty Message", "Please enter a message to broadcast.", appState.mainWin)
 		return
@@ -333,7 +337,7 @@ func (appState *AppState) sendBroadcast() {
 		dialog.ShowError(err, appState.mainWin)
 		appState.logMessage(fmt.Sprintf("Error sending Broadcast message: %v", err))
 	}
-	appState.messageEntry.SetText("")
+	appState.broadcastMessageEntry.SetText("")
 }
 
 func (appState *AppState) setTCPConnected(connected bool) {
