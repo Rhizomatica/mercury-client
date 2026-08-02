@@ -16,12 +16,18 @@ Mercury Client is a desktop utility for connecting to a Mercury HF modem over TC
 - Go 1.20+ installed
 - Fyne-compatible desktop environment
 
-### Build
+### Linux Build
 
 ```bash
 git clone https://github.com/Rhizomatica/mercury-client.git
 cd mercury-client
 go build -o mercury-client .
+```
+
+### Windows Build
+
+```bash
+GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -o mercury-client.exe .
 ```
 
 ### Run
