@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -39,6 +40,10 @@ type AppState struct {
 	sendBroadcastButton *widget.Button
 
 	logOutput *widget.Entry
+
+	chatOutput  *widget.Entry
+	remoteCall  string
+	chatRxBuffer string
 
 	mainWin fyne.Window
 }
@@ -130,6 +135,11 @@ func (appState *AppState) setupUI(a fyne.App) {
 	appState.logOutput.SetPlaceHolder("Activity Log...")
 	appState.logOutput.Wrapping = fyne.TextWrapBreak
 	appState.logOutput.Disable()
+
+	appState.chatOutput = widget.NewMultiLineEntry()
+	appState.chatOutput.SetPlaceHolder("No ARQ chat messages yet...")
+	appState.chatOutput.Wrapping = fyne.TextWrapBreak
+	appState.chatOutput.Disable()
 }
 
 func (appState *AppState) createContent() fyne.CanvasObject {
@@ -191,13 +201,19 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 		controls,
 	)
 
-	rightPanel := container.NewBorder(
+	chatBox := container.NewBorder(
+		widget.NewLabelWithStyle("ARQ Chat", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		nil, nil, nil, container.NewScroll(appState.chatOutput),
+	)
+
+	activityLogBox := container.NewBorder(
 		widget.NewLabelWithStyle("Activity Log", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		container.NewVSplit(
-			container.NewScroll(appState.logOutput),
-			container.NewVBox(),
-		),
+		nil, nil, nil, container.NewScroll(appState.logOutput),
+	)
+
+	rightPanel := container.NewBorder(
+		nil, nil, nil, nil,
+		container.NewVSplit(chatBox, activityLogBox),
 	)
 
 	return container.NewHSplit(leftPanel, rightPanel)
@@ -305,13 +321,14 @@ func (appState *AppState) sendARQMessage() {
 		return
 	}
 
-	err := appState.modemClient.SendARQData([]byte(msg))
+	err := appState.modemClient.SendARQData([]byte(msg + "\n"))
 	if err != nil {
 		dialog.ShowError(err, appState.mainWin)
 		appState.logMessage(fmt.Sprintf("Error sending ARQ data: %v", err))
 		return
 	}
 	appState.logMessage(fmt.Sprintf("ARQ Data TX: %d bytes", len(msg)))
+	appState.appendChat(fmt.Sprintf("%s: %s", appState.myCallsignEntry.Text, msg))
 	appState.arqMessageEntry.SetText("")
 }
 
@@ -426,7 +443,28 @@ func (appState *AppState) handleIncomingARQ() {
 	}
 	for arqMsg := range appState.modemClient.IncomingARQCh {
 		appState.logMessage(fmt.Sprintf("ARQ Control: %s", arqMsg))
+		if strings.HasPrefix(arqMsg, "CONNECTED") {
+			appState.updateRemoteCall(arqMsg)
+		}
 	}
+}
+
+func (appState *AppState) updateRemoteCall(connectedLine string) {
+	fields := strings.Fields(connectedLine)
+	if len(fields) < 3 {
+		return
+	}
+	myCall := strings.ToUpper(strings.TrimSpace(appState.myCallsignEntry.Text))
+	callA := fields[1]
+	callB := fields[2]
+	if strings.ToUpper(callA) == myCall {
+		appState.remoteCall = callB
+	} else if strings.ToUpper(callB) == myCall {
+		appState.remoteCall = callA
+	} else {
+		appState.remoteCall = callA
+	}
+	appState.logMessage(fmt.Sprintf("Remote ARQ callsign set to: %s", appState.remoteCall))
 }
 
 func (appState *AppState) handleIncomingARQData() {
@@ -435,7 +473,38 @@ func (appState *AppState) handleIncomingARQData() {
 	}
 	for data := range appState.modemClient.IncomingARQDataCh {
 		appState.logMessage(fmt.Sprintf("ARQ Data RX: %d bytes: %q", len(data), string(data)))
+		appState.chatRxBuffer += string(data)
+		for {
+			idx := strings.IndexByte(appState.chatRxBuffer, '\n')
+			if idx < 0 {
+				break
+			}
+			line := strings.TrimRight(appState.chatRxBuffer[:idx], "\r")
+			appState.chatRxBuffer = appState.chatRxBuffer[idx+1:]
+			if strings.TrimSpace(line) != "" {
+				call := appState.remoteCall
+				if call == "" {
+					call = appState.targetCallsignEntry.Text
+				}
+				appState.appendChat(fmt.Sprintf("%s: %s", call, line))
+			}
+		}
+		if len(appState.chatRxBuffer) > 65536 {
+			appState.chatRxBuffer = appState.chatRxBuffer[len(appState.chatRxBuffer)-4096:]
+		}
 	}
+}
+
+func (appState *AppState) appendChat(line string) {
+	fyne.Do(func() {
+		currentText := appState.chatOutput.Text
+		if currentText == "" {
+			appState.chatOutput.SetText(line)
+		} else {
+			appState.chatOutput.SetText(fmt.Sprintf("%s\n%s", line, currentText))
+		}
+		appState.chatOutput.Refresh()
+	})
 }
 
 func (appState *AppState) handleIncomingBroadcast() {
@@ -458,6 +527,8 @@ func (appState *AppState) handleStatus() {
 		case "CONNECTED":
 			appState.setARQConnected(true)
 		case "DISCONNECTED":
+			appState.remoteCall = ""
+			appState.chatRxBuffer = ""
 			appState.setARQConnected(false)
 		}
 	}
