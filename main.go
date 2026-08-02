@@ -33,6 +33,7 @@ type AppState struct {
 	disconnectButton    *widget.Button
 	connectARQButton    *widget.Button
 	disconnectARQButton *widget.Button
+	abortARQButton      *widget.Button
 	sendARQMsgButton    *widget.Button
 	sendARQFileButton   *widget.Button
 	sendBroadcastButton *widget.Button
@@ -44,7 +45,7 @@ type AppState struct {
 
 func main() {
 	a := app.New()
-	w := a.NewWindow("Mercury HF Client PoC")
+	w := a.NewWindow("Mercury Client")
 
 	appState := &AppState{}
 	appState.mainWin = w
@@ -71,7 +72,7 @@ func (appState *AppState) setupUI(a fyne.App) {
 	appState.targetCallsignEntry.SetText("DEST")
 
 	appState.targetIPEntry = widget.NewEntry()
-	appState.targetIPEntry.SetPlaceHolder("Target IP")
+	appState.targetIPEntry.SetPlaceHolder("IP Address")
 	appState.targetIPEntry.SetText("127.0.0.1")
 
 	appState.arqPortEntry = widget.NewEntry()
@@ -109,10 +110,12 @@ func (appState *AppState) setupUI(a fyne.App) {
 	appState.disconnectButton = widget.NewButton("Disconnect TCP", appState.disconnect)
 	appState.disconnectButton.Disable()
 
-	appState.connectARQButton = widget.NewButton("Connect ARQ", appState.connectARQ)
+	appState.connectARQButton = widget.NewButton("Connect", appState.connectARQ)
 	appState.connectARQButton.Disable()
-	appState.disconnectARQButton = widget.NewButton("Disconnect ARQ", appState.disconnectARQ)
+	appState.disconnectARQButton = widget.NewButton("Disconnect", appState.disconnectARQ)
 	appState.disconnectARQButton.Disable()
+	appState.abortARQButton = widget.NewButton("Abort", appState.abortARQ)
+	appState.abortARQButton.Disable()
 
 	appState.sendARQMsgButton = widget.NewButton("Send ARQ Message", appState.sendARQMessage)
 	appState.sendARQMsgButton.Disable()
@@ -133,7 +136,7 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 	configForm := widget.NewForm(
 		&widget.FormItem{Text: "My Callsign", Widget: appState.myCallsignEntry},
 		&widget.FormItem{Text: "Target Callsign", Widget: appState.targetCallsignEntry},
-		&widget.FormItem{Text: "Target IP", Widget: appState.targetIPEntry},
+		&widget.FormItem{Text: "IP Address", Widget: appState.targetIPEntry},
 		&widget.FormItem{Text: "ARQ Port", Widget: appState.arqPortEntry},
 		&widget.FormItem{Text: "Broadcast Port", Widget: appState.broadcastPortEntry},
 	)
@@ -146,6 +149,7 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 	arqButtons := container.NewHBox(
 		appState.connectARQButton,
 		appState.disconnectARQButton,
+		appState.abortARQButton,
 	)
 
 	messageInput := container.NewVBox(
@@ -276,6 +280,15 @@ func (appState *AppState) disconnectARQ() {
 	appState.setARQConnected(false)
 }
 
+func (appState *AppState) abortARQ() {
+	if appState.modemClient == nil {
+		return
+	}
+	appState.logMessage("Aborting ARQ session...")
+	appState.modemClient.AbortARQ()
+	appState.setARQConnected(false)
+}
+
 func (appState *AppState) sendARQMessage() {
 	msg := appState.arqMessageEntry.Text
 	if msg == "" {
@@ -352,6 +365,7 @@ func (appState *AppState) setTCPConnected(connected bool) {
 			appState.disconnectButton.Disable()
 			appState.connectARQButton.Disable()
 			appState.disconnectARQButton.Disable()
+			appState.abortARQButton.Disable()
 			appState.sendARQMsgButton.Disable()
 			appState.sendARQFileButton.Disable()
 			appState.sendBroadcastButton.Disable()
@@ -364,11 +378,13 @@ func (appState *AppState) setARQConnected(connected bool) {
 		if connected {
 			appState.connectARQButton.Disable()
 			appState.disconnectARQButton.Enable()
+			appState.abortARQButton.Enable()
 			appState.sendARQMsgButton.Enable()
 			appState.sendARQFileButton.Enable()
 		} else {
 			appState.connectARQButton.Enable()
 			appState.disconnectARQButton.Disable()
+			appState.abortARQButton.Disable()
 			appState.sendARQMsgButton.Disable()
 			appState.sendARQFileButton.Disable()
 		}
