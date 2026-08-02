@@ -193,7 +193,11 @@ func (appState *AppState) createContent() fyne.CanvasObject {
 
 	rightPanel := container.NewBorder(
 		widget.NewLabelWithStyle("Activity Log", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		nil, nil, nil, container.NewScroll(appState.logOutput),
+		nil, nil, nil,
+		container.NewVSplit(
+			container.NewScroll(appState.logOutput),
+			container.NewVBox(),
+		),
 	)
 
 	return container.NewHSplit(leftPanel, rightPanel)
