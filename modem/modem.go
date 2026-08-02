@@ -155,6 +155,7 @@ func (mc *ModemClient) SendCommand(cmd string) error {
 	if mc.ARQControlConn == nil {
 		return fmt.Errorf("not connected")
 	}
+	mc.LogCh <- fmt.Sprintf("TX Command: %s", cmd)
 	_, err := mc.ARQControlConn.Write([]byte(cmd + "\r"))
 	return err
 }
